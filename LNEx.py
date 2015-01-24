@@ -116,22 +116,24 @@ class Servidor():
         elif self.next == "!sair":
             print "Fechando o servidor e desconectando."
             self.server_socket.close()
-            print "De volta ao menu principal, digite !ajuda para ajuda."
-            self.isRunning = False
+            #Sai de tudo para evitar erro de Adress already in use.
+            thread.exit()
 
-        elif self.next != "!sair" and self.next != "!ajuda":
+        elif self.next != "!ajuda" and self.next != "!sair":
             self.svDistBash(self.next)
 
     def svDistBash(self, bash):
-        for wsock in self.write_sockets:
-            if wsock != self.server_socket:
-                try:
-                    wsock.send(bash)
-                except:
-                    #Zicou a conexão
-                    wsock.close()
-    	            CONNECTION_LIST.remove(socket)
-                    print "Cliente (%s, %s) desconectado" %self.addr
+        for socket in self.CONNECTION_LIST:
+            try:
+                print "Tentando enviar!"
+                print self.CONNECTION_LIST
+                print socket
+                socket.sendall(bash)
+            except:
+                #Zicou a conexão
+                socket.close()
+    	        self.CONNECTION_LIST.remove(socket)
+                print "Cliente (%s, %s) desconectado" %self.addr
 
 
     def svUpdate(self):
@@ -143,6 +145,7 @@ class Servidor():
                 self.sockfd, self.addr = self.server_socket.accept()
                 self.CONNECTION_LIST.append(self.sockfd)
                 print "Cliente (%s, %s) conectado" %self.addr
+                print "Pronto para receber comando:"
 
     def getNext(self):
       self.next = raw_input("exec> ")
@@ -175,14 +178,19 @@ class Cliente():
         while self.isRunning:
             self.clEngine()
 
-        
+
 
     def clEngine(self):
-        self.bash = self.clsock.recv(1024)
-        print "(Recebido)> %s" %self.bash
-        if not self.bash:
+        try:
+            self.bash = self.clsock.recv(1024)
+            print "(Recebido)> %s" %self.bash
+            if not self.bash:
+                self.clsock.close()
+        except:
             self.clsock.close()
-
+            print "Desconectado do servidor!"
+            print "De volta ao menu principal! Para reconectar digite !cliente"
+            self.isRunning = False
 
     def getNext(self):
       self.next = raw_input("exec> ")
