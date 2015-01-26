@@ -5,6 +5,7 @@ import sys
 import os
 import thread
 import subprocess
+import ConfigParser
 
 class Main():
   def __init__(self):
@@ -12,19 +13,22 @@ class Main():
     print ""
     print "        Bem-vindo ao LNEx  "
     print ""
-    print "[+]  Você está na versão 0.0.1a."
+    print "[+]  Você está na versão 0.0.4a."
     print "[+]  Este programa foi desenvolvido por @LinconD, em caso de dúvida"
     print "viste o !ajuda ou entre em contato comigo."
     print "[+]  Você pode visitar o !sobre para mais informações sobre o programa!"
     print "[!]  Em caso de bugs ou falhas, favor reportar no GitHub com screenshot!"
     print "O GitHub está disponivel em !sobre"
-    print "[+]  Console Inciado."
-    print "[!]Aguardando Instruções."
 
+    #Carrega a configuração
     self.isRunning = True
+    self.svConfg = self.loadConfig()
 
-    while self.isRunning:
-      self.core(self.getNext())
+    if self.isRunning:
+        print "[+]  Console Inciado."
+        print "[!]Aguardando Instruções."
+        while self.isRunning:
+            self.core(self.getNext())
 
     sys.exit()
 
@@ -49,14 +53,15 @@ class Main():
     elif self.next == "!servidor":
         os.system('cls' if os.name == 'nt' else 'clear')
         print "[+]  Inciando servidor..."
-        self.servidor = Servidor()
+        self.servidor = Servidor(self.svConfg)
 
     elif self.next == "!cliente":
-        print "[?]  Entre com o IP:"
-        self.ip = raw_input("(IP)>")
+        print "[?]  Entre com o IP:Porta(ex.: 192.168.0.1:5056)"
+        self.ip = raw_input("(IP:Porta)> ")
+        self.nip = self.ip.split(":")
         os.system('cls' if os.name == 'nt' else 'clear')
         print "[+]  Inciando conexão..."
-        self.cliente = Cliente(self.ip)
+        self.cliente = Cliente(self.nip[0], self.nip[1])
 
     elif self.next == "!sobre":
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -82,15 +87,59 @@ class Main():
          self.next != "!sair":
             print "[-]  Comando não encontrado! Verifique a ortografia ou se não esqueceu do '!'"
 
-    def directConnect(self, IP):
+
+  #Tratamento de arquivos
+  def loadConfig(self):
+      try:
+          self.confFile = open("LNEx.conf", "r")
+          print "[+]  Arquivo de configuração carregado com sucesso!"
+      except:
+          print "[!]  Não foi possível localizar o arquivo de configuração."
+          self.newConfig()
+
+      #Gambiarra(?) por aqui
+      self.parser = ConfigParser.ConfigParser()
+      self.parser.readfp(self.confFile)
+      self.userConf = []
+      self.userConf.append(self.parser.get("servidor", "serverIP"))
+      self.userConf.append(self.parser.get("servidor", "serverPort"))
+      self.userConf.append(self.parser.get("servidor", "serverBuffer"))
+      self.userConf.append(self.parser.get("servidor", "serverMaxUser"))
+
+      return self.userConf
+
+  def newConfig(self):
+        try:
+            self.confFile = open("LNEx.conf", "w")
+            print "[+]  Novo arquivo de configuração criado."
+            print "[!]  Escrevendo confugurações default..."
+            self.default = "[servidor]\nserverIP= 127.0.0.1\nserverPort= 5056\nserverBuffer= 1024;\nserverMaxUser= 5"
+            self.confFile.write(self.default)
+            print "[+]  Configuração terminada."
+            print "[!]  Saia do programa e alterar as configurações ou continue com configuração de localhost(127.0.0.1)."
+            print "[!]  A configuração de localhost NÃO permite controle da rede local, somente no próprio computador que está o servidor!"
+            self.confFile.close()
+            self.loadConfig()
+
+        except:
+            print "[-] Não foi possível criar arquivo de configuração!"
+            print "[-] Abortando programa..."
+            self.isRunning = False
+
+    #Fim do tratamento de arquivos
+
+
+  def directConnect(self, IP):
         print "Direct connect!"
 
 
 class Servidor():
-    def __init__(self):
+    def __init__(self, svConfg):
         #Várivéis para o servidor
-        self.HOST = "127.0.0.1"
-        self.PORT = 5056
+        self.HOST = svConfg[0]
+        self.PORT = int(svConfg[1])
+        self.BUFFER = svConfg[2]
+        self.MAXUSERS = int(svConfg[3])
 
         self.CONNECTION_LIST = []
         self.SERVER_LIST = []
@@ -98,11 +147,12 @@ class Servidor():
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind((self.HOST, self.PORT))
-    	self.server_socket.listen(5)
+    	self.server_socket.listen(self.MAXUSERS)
 
         self.SERVER_LIST.append(self.server_socket)
 
-        print "[+]  Servidor iniciado na porta " + str(self.PORT)
+        print "[+]  Servidor iniciado em " + self.HOST + " na porta " + str(self.PORT)
+        print "[!]  Para alterar o IP, edite o arquivo de configuração LNEx.conf."
         print "[+]  Inciando engine..."
 
         self.isRunning = True
@@ -170,10 +220,10 @@ class Servidor():
 
 
 class Cliente():
-    def __init__(self, ip):
+    def __init__(self, ip, port):
         #Várivéis para o cliente
         self.HOST = ip
-        self.PORT = 5056
+        self.PORT = int(port)
 
         self.clsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
